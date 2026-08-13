@@ -1,9 +1,8 @@
-from django.db.models import Avg, Count, Q
-from django.utils import timezone
+from django.db.models import Q
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
-from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .models import (
@@ -48,7 +47,6 @@ class UserViewSet(viewsets.ModelViewSet):
         return UserListSerializer
 
     def get_queryset(self):
-        # Fixed: Removed .only() to avoid conflict with select_related
         return User.objects.select_related("profile")
 
 
@@ -87,12 +85,10 @@ class LSAProfileViewSet(viewsets.ModelViewSet):
             .prefetch_related("specializations")
         )
 
-        # Filter by specialization
         specialization = self.request.query_params.get("specialization")
         if specialization:
             qs = qs.filter(specializations__name__iexact=specialization)
 
-        # Filter by max hourly rate
         max_rate = self.request.query_params.get("max_rate")
         if max_rate:
             try:
@@ -100,12 +96,10 @@ class LSAProfileViewSet(viewsets.ModelViewSet):
             except ValueError:
                 raise ValidationError({"max_rate": "Must be a number."})
 
-        # Filter by verification status
         verified = self.request.query_params.get("verified")
         if verified is not None:
             qs = qs.filter(is_verified=verified.lower() in ("true", "1", "yes"))
 
-        # Filter by minimum rating
         min_rating = self.request.query_params.get("min_rating")
         if min_rating:
             try:
@@ -282,7 +276,6 @@ class BookingViewSet(viewsets.ModelViewSet):
 class ReviewViewSet(viewsets.ModelViewSet):
     """Parents review completed bookings; LSAs read their reviews."""
 
-    # Add permission classes to require authentication
     permission_classes = [IsAuthenticated]
 
     def get_serializer_class(self):
@@ -295,13 +288,12 @@ class ReviewViewSet(viewsets.ModelViewSet):
         qs = Review.objects.select_related(
             "booking__parent", "booking__lsa"
         )
-        
-        # Now user is guaranteed to be authenticated
+
         if user.role == UserRole.LSA:
             return qs.filter(booking__lsa=user)
         if user.role == UserRole.PARENT:
             return qs.filter(booking__parent=user)
-        return qs.none()  # Return empty queryset for other roles
+        return qs.none()
 
     def perform_create(self, serializer):
         serializer.save()
