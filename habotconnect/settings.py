@@ -4,7 +4,7 @@ Django settings for HabotConnect.
 A standalone, lightweight RESTful backend for matching parents with
 Learning Support Assistants (LSAs).
 """
-
+import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
